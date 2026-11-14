@@ -101,3 +101,18 @@ def repo(tmp_path: Path) -> Path:
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "initial")
     return root
+
+
+@pytest.fixture(scope="session")
+def go_engine(tmp_path_factory, helm_bin):
+    """Go-template engine for ApplicationSet tests: real helm, or a Go stand-in built on the fly."""
+    if os.environ.get("CHARTDELTA_REAL_HELM") == "1":
+        return
+    if not shutil.which("go"):
+        pytest.skip("ApplicationSet tests need real helm (CHARTDELTA_REAL_HELM=1) or the Go toolchain")
+    binary = tmp_path_factory.mktemp("engine") / "engine"
+    src = Path(__file__).parent / "fake_helm_engine" / "main.go"
+    built = subprocess.run(["go", "build", "-o", str(binary), str(src)], capture_output=True, text=True)
+    if built.returncode != 0:
+        pytest.skip(f"could not build the Go template stand-in: {built.stderr}")
+    os.environ["FAKE_HELM_ENGINE"] = str(binary)

@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [{ name = "Radhana" }]
-keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "claude-skill"]
+keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "applicationset", "claude-skill"]
 classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
@@ -26,7 +26,7 @@ dev = ["pytest>=7"]
 chartdelta = "chartdelta.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_GITHUB_USER/chartdelta"
+Homepage = "https://github.com/rdomala-netizen/chartdelta"
 
 [tool.hatch.version]
 path = "src/chartdelta/__init__.py"

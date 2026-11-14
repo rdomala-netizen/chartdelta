@@ -119,6 +119,61 @@ Remember that `helm upgrade` does not update CRDs shipped in a chart's
 sync). This command compares charts, not the cluster: it cannot see which CRD
 versions your existing objects are stored at.
 
+## Previewing an Argo CD ApplicationSet
+
+Edit a values file, an `addon.yaml`, or the ApplicationSet itself, and see
+which generated Applications are affected and what changes in their
+manifests, before you push. No cluster and no running Argo CD.
+
+```sh
+# one-off: list your clusters (names, servers, labels only; no credentials)
+chartdelta appset export-clusters --context my-argocd-cluster > clusters.yaml
+
+# which Applications does it generate, from which path, with which values files?
+chartdelta appset generate appsets/addons.yaml --clusters clusters.yaml
+
+# what do my uncommitted changes do, per Application?
+chartdelta appset diff appsets/addons.yaml --clusters clusters.yaml --summary
+chartdelta appset diff appsets/addons.yaml --clusters clusters.yaml --base origin/main --app 'kyverno-*'
+```
+
+```console
+ApplicationSet addons: HEAD@b19d7dc5 -> working tree
+Applications: 0 added, 0 removed, 2 changed, 3 unchanged, 0 error
+
+~ kyverno-dev  (changed, https://dev:6443)
+  Application spec changed
+  resources: 0 added, 0 removed, 1 changed, 0 unchanged
+  ~ Deployment/kyverno/kyverno
+      spec.template.spec.containers[name=main].image
+```
+
+How it works: the generators are evaluated against your local checkout, the
+template is expanded (Go templates are evaluated by Helm's own engine, so
+`index`, `with`, variables and sprig functions behave as they do in Argo CD),
+each Application's Helm source is rendered at the base ref and in your working
+tree, and the results are diffed per resource.
+
+- **Repositories**: a `repoURL` is matched to a local checkout by its `origin`
+  remote. The repo containing the ApplicationSet file and the repo you are
+  standing in are found automatically; add others with
+  `--repo https://github.com/org/values-repo.git=~/git/values-repo`.
+- **Generators**: `list`, `git` (files and directories), `clusters`, `matrix`.
+- **Sources**: Helm charts in Git (`path`), with `valueFiles` (including
+  `ignoreMissingValueFiles` and `$ref/...` from a second source), `values`,
+  `valuesObject`, `parameters`, `releaseName`; plain YAML directories; charts
+  from a Helm or OCI repository (`chart:`).
+- A missing source path or values file is reported per Application as an
+  error, which catches a version folder that does not exist yet.
+
+This is a fast local approximation, not Argo CD itself. Not covered: `merge`,
+SCM provider, pull request and plugin generators, `templatePatch`, Kustomize
+sources, config management plugins, and `goTemplateOptions`
+(`missingkey=error` is not enforced: a missing key renders as empty). The
+`revision` and `targetRevision` fields are ignored in favour of your local
+tree. For an exact check in CI, use
+[argocd-diff-preview](https://github.com/dag-andersen/argocd-diff-preview).
+
 ## Catching values that Helm silently ignores
 
 Helm accepts any key in a values file. A typo (`replicas` instead of
