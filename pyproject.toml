@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chartdelta"
+dynamic = ["version"]
+description = "Render a Helm chart with real values and diff the manifests against the original (git ref, another chart, or other values). No cluster needed."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Radhana" }]
+keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "claude-skill"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Topic :: System :: Systems Administration",
+  "Programming Language :: Python :: 3",
+]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+chartdelta = "chartdelta.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/YOUR_GITHUB_USER/chartdelta"
+
+[tool.hatch.version]
+path = "src/chartdelta/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chartdelta"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
