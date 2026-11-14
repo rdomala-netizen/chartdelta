@@ -33,7 +33,7 @@ pipx install chartdelta      # or: uv tool install chartdelta
 uvx chartdelta --help        # run without installing
 ```
 
-Requires Python 3.9+, `helm` 3 on `PATH`, and `git` for git-based comparisons.
+Requires Python 3.12+, `helm` 3 on `PATH`, and `git` for git-based comparisons.
 
 ## What is "the original"?
 

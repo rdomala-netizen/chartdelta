@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Render a Helm chart with real values and diff the manifests against the original (git ref, another chart, or other values). No cluster needed."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [{ name = "Radhana" }]
 keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "applicationset", "claude-skill"]
 classifiers = [
