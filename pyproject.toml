@@ -26,7 +26,7 @@ dev = ["pytest>=7"]
 chartdelta = "chartdelta.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_GITHUB_USER/chartdelta"
+Homepage = "https://github.com/rdomala-netizen/chartdelta"
 
 [tool.hatch.version]
 path = "src/chartdelta/__init__.py"
