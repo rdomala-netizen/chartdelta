@@ -1,11 +1,11 @@
 # chartdelta
 
-See what your Helm chart change **actually renders to**, before you commit it.
+See what your Helm chart change actually renders to, before you commit it.
 
-`chartdelta` renders a chart twice with `helm template` — once as it was (the
-original) and once as it is now (your modifications) — and shows a
-per-resource diff of the manifests. No cluster, no installed release, no Helm
-plugin: just `helm`, `git`, and this CLI.
+`chartdelta` renders a chart twice with `helm template`, once as it was and
+once as it is now, and shows a per-resource diff of the manifests. No
+cluster, no installed release, no Helm plugin: just `helm`, `git`, and this
+CLI.
 
 ```console
 $ chartdelta diff charts/app1 -f envs/prod.yaml
@@ -45,24 +45,24 @@ Requires Python 3.12+, `helm` 3 on `PATH`, and `git` for git-based comparisons.
 | two values files on the same chart | `chartdelta diff CHART -f new.yaml --base-values old.yaml` |
 | two chart directories | `chartdelta diff ./new-chart --base-chart ./old-chart -f values.yaml` |
 
-In git mode, both the chart **and** the `-f` values files are taken as they
+In git mode, both the chart and the `-f` values files are taken as they
 were at the base ref, so a change to either shows up. A values file that did
 not exist at the base ref (or lives outside the repo) is used on both sides.
 
 ## Useful options
 
-- `-o text|markdown|json` — `markdown` is made for merge-request comments,
+- `-o text|markdown|json`: `markdown` is made for merge-request comments,
   `json` includes `changedPaths` per resource (e.g.
   `spec.template.spec.containers[name=app].image`) for tooling and AI agents.
-- `--summary` — changed resources and field paths only, no diff bodies.
-- `--exit-code` — exit `2` when there are differences (`0` none, `1` error).
-- `--ignore-version-labels` — hide `helm.sh/chart` / `app.kubernetes.io/version`
+- `--summary`: changed resources and field paths only, no diff bodies.
+- `--exit-code`: exit `2` when there are differences (`0` none, `1` error).
+- `--ignore-version-labels`: hide `helm.sh/chart` / `app.kubernetes.io/version`
   churn after a chart version bump. `--ignore-label KEY` for anything else.
-- `--kind Deployment` — restrict to some kinds.
+- `--kind Deployment`: restrict to some kinds.
 - `--set`, `--set-string`, `-r/--release`, `-n/--namespace`, `--kube-version`,
-  `--api-versions`, `--include-crds`, `--no-hooks`, `--helm-arg` — forwarded
+  `--api-versions`, `--include-crds`, `--no-hooks`, `--helm-arg`: forwarded
   to `helm template` on both sides.
-- `--build-deps` — run `helm dependency build` when subcharts are missing.
+- `--build-deps`: run `helm dependency build` when subcharts are missing.
   If the base side's dependencies are unchanged, your already-downloaded
   `charts/` is reused, with no network access.
 - Secret values are replaced by a short hash by default, so you see *that* a
@@ -95,20 +95,20 @@ chartdelta upgrade --from ./old-chart --to ./new-chart -f values.yaml     # alre
 ```
 
 Pulls both versions with `helm pull` (no manual download or unzip), renders
-each with **your** values, and reports:
+each with your values, and reports:
 
-- **Chart metadata**: appVersion, `kubeVersion` constraint, subchart versions.
-- **CRDs**: added / removed / changed, and for each changed CRD the API
-  versions added or removed, versions no longer served, storage-version
-  changes, and how many schema fields changed. Each is marked `BREAKING`
-  (a version clients can use today is removed or no longer served) or
-  `CHECK` (storage version moved, or an unserved version was removed). Full CRD diffs only with `--crd-diff`.
-- **Rendered resources**: the per-resource diff, with version-label churn
+- Chart metadata: appVersion, `kubeVersion` constraint, subchart versions.
+- CRDs added, removed or changed, and for each changed CRD the API versions
+  added or removed, versions no longer served, storage-version changes, and
+  how many schema fields changed. Each is marked `BREAKING` (a version
+  clients can use today is removed or no longer served) or `CHECK` (storage
+  version moved, or an unserved version was removed). Full CRD diffs only
+  with `--crd-diff`.
+- The rendered resources, as a per-resource diff, with version-label churn
   hidden by default.
-- **Default values**: defaults that were removed, changed or added.
-- **Your values**: keys in your values files that the new version no longer
-  reads (renamed or removed options), separated from keys that were already
-  ignored before.
+- Default values that were removed, changed or added.
+- Keys in your values files that the new version no longer reads (renamed or
+  removed options), separated from keys that were already ignored before.
 
 `--summary` drops the diff bodies, `-o markdown|json` as usual, `--keep DIR`
 keeps the pulled charts, `--exit-code` exits 2 on a breaking CRD change or a
@@ -121,23 +121,25 @@ versions your existing objects are stored at.
 
 ## Previewing an Argo CD ApplicationSet
 
-> **Experimental.** This is new. Generator and source coverage will keep
-> growing; see the limits below. Feedback and bug reports are welcome.
+Experimental: this is new, and generator and source coverage will keep
+growing. See the limits below. Feedback and bug reports are welcome.
 
 Edit a values file, an `addon.yaml`, or the ApplicationSet itself, and see
 which generated Applications are affected and what changes in their
 manifests, before you push. No cluster and no running Argo CD.
 
-```sh
-# one-off: list your clusters (names, servers, labels only; no credentials)
-chartdelta appset export-clusters --context my-argocd-cluster > clusters.yaml
+If the ApplicationSet uses a `clusters` generator, first write a small YAML
+file listing your clusters' names, servers and labels (no credentials) -
+this is the one piece of cluster state the preview can't discover on its
+own.
 
+```sh
 # which Applications does it generate, from which path, with which values files?
 chartdelta appset generate appsets/addons.yaml --clusters clusters.yaml
 
 # what do my uncommitted changes do, per Application?
 chartdelta appset diff appsets/addons.yaml --clusters clusters.yaml --summary
-chartdelta appset diff appsets/addons.yaml --clusters clusters.yaml --base origin/main --app 'kyverno-*'
+chartdelta appset diff appsets/addons.yaml --clusters clusters.yaml --app 'kyverno-*'
 ```
 
 ```console
@@ -157,21 +159,21 @@ template is expanded (Go templates are evaluated by Helm's own engine, so
 each Application's Helm source is rendered at the base ref and in your working
 tree, and the results are diffed per resource.
 
-- **Repositories**: a `repoURL` is matched to a local checkout by its `origin`
+- Repositories: a `repoURL` is matched to a local checkout by its `origin`
   remote. The repo containing the ApplicationSet file and the repo you are
   standing in are found automatically; add others with
   `--repo https://github.com/org/values-repo.git=~/git/values-repo`.
-- **Generators**: `list`, `git` (files and directories), `clusters`, `matrix`.
-- **Sources**: Helm charts in Git (`path`), with `valueFiles` (including
-  `ignoreMissingValueFiles` and `$ref/...` from a second source), `values`,
-  `valuesObject`, `parameters`, `releaseName`; plain YAML directories; charts
-  from a Helm or OCI repository (`chart:`).
+- Generators: `list`, `git` (files and directories), `clusters`, `matrix`.
+- Sources: Helm charts in Git (`path`), with `valueFiles`,
+  `ignoreMissingValueFiles` and `releaseName`; plain YAML directories.
 - A missing source path or values file is reported per Application as an
   error, which catches a version folder that does not exist yet.
 
-This is a fast local approximation, not Argo CD itself. Not covered: `merge`,
-SCM provider, pull request and plugin generators, `templatePatch`, Kustomize
-sources, config management plugins, and `goTemplateOptions`
+This is a fast local approximation, not Argo CD itself. Not covered yet:
+`merge`, SCM provider, pull request and plugin generators, `templatePatch`,
+Kustomize sources, config management plugins, `values`/`valuesObject`/
+`parameters` on a Helm source, charts pulled from a Helm or OCI repository
+(`chart:`), multi-source `$ref` value files, and `goTemplateOptions`
 (`missingkey=error` is not enforced: a missing key renders as empty). The
 `revision` and `targetRevision` fields are ignored in favour of your local
 tree. For an exact check in CI, use
@@ -194,7 +196,7 @@ IGNORED  tag  (envs/prod.yaml)
 ```
 
 A key is reported when it is missing from the chart's default values, no
-template references `.Values.<path>`, **and** rendering the chart without it
+template references `.Values.<path>`, and rendering the chart without it
 gives identical output. Subchart values are checked against the subchart
 (when it is present in `charts/`), `global` is skipped, and maps whose default
 is `{}` (annotations, nodeSelector, …) are treated as free-form. Structural
@@ -225,7 +227,7 @@ helm-diff:
 ## How it differs from the helm-diff plugin
 
 [helm-diff](https://github.com/databus23/helm-diff) compares a chart against a
-**release installed in a cluster**. `chartdelta` compares two **renderings**
+release installed in a cluster. `chartdelta` compares two renderings
 (git ref, directory, or values), which fits GitOps workflows where Argo CD or
 Flux does the deploy and you want to review the change at merge-request time.
 It does not see live-cluster drift.
