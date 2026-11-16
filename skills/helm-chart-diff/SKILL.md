@@ -136,7 +136,38 @@ chartdelta upgrade <repo/chart | oci://...> --from <current> --to <target> -f <v
 - This compares charts only. Always recommend reading the chart's upgrade
   notes or changelog for manual steps the manifests cannot show.
 
-## 8. Report
+## 8. Argo CD ApplicationSets
+
+When the user changes an ApplicationSet, or a file that feeds one (a values
+file, a generator file such as `addon.yaml`, a chart version folder), preview
+the effect per generated Application:
+
+```sh
+chartdelta appset generate <appset.yaml> --clusters <clusters.yaml> -o json
+chartdelta appset diff <appset.yaml> --clusters <clusters.yaml> -o json --summary
+```
+
+- `--clusters` is needed when the set uses the clusters generator. Look for an
+  existing clusters file in the repo; otherwise ask the user to run
+  `chartdelta appset export-clusters > clusters.yaml` (it reads names, servers
+  and labels from Argo CD's cluster secrets, never credentials). Do not invent
+  cluster labels.
+- If a `repoURL` has no local checkout, the error names the `--repo URL=PATH`
+  flag to add. Ask the user where that repo is cloned.
+- Default comparison is the working tree against `HEAD`; use `--base
+  origin/main` for a branch. Narrow with `--app '<glob>'`.
+- Report: which Applications are added, removed, changed or in error; for each
+  changed one, whether the Application spec itself changed (path, version,
+  values files) and which resources and fields changed. Name the clusters
+  affected and, equally, the ones not affected when the user expected them to
+  be.
+- An Application in `error` is a finding: usually a version folder or values
+  file that does not exist for that cluster.
+- State the limits when relevant: this is a local approximation of Argo CD;
+  merge/SCM/pull-request/plugin generators, `templatePatch`, Kustomize sources
+  and `missingkey=error` are not covered. Check `warnings` in the output.
+
+## 9. Report
 
 Lead with the outcome, then the evidence:
 

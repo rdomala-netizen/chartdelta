@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addons
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          # 1) one item per add-on folder that has an addon.yaml
+          - git:
+              repoURL: https://github.com/rdomala-netizen/argocd-manifests.git
+              revision: main
+              files:
+                - path: addons/*/addon.yaml
+          # 2) for each add-on: only clusters switched on for it.
+          #    The version no longer has to be a cluster label: it comes from
+          #    addon.yaml → versions.<env>, unless the cluster pins its own.
+          - clusters:
+              selector:
+                matchExpressions:
+                  - key: 'enable_{{ .addon.label }}'
+                    operator: In
+                    values: ["true"]
+  template:
+    metadata:
+      name: '{{ .addon.name }}-{{ .name }}'
+      labels:
+        addon: '{{ .addon.name }}'
+        env: '{{ index .metadata.labels "env" | default "none" }}'
+        ring: '{{ index .metadata.labels "ring" | default "main" }}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/rdomala-netizen/argocd-manifests.git
+        targetRevision: main
+        # Which version folder (first match wins):
+        #   1. the cluster label <addon>_version       – a one-off pin on one cluster
+        #   2. addon.yaml → versions.<ring label>       – e.g. ring=canary clusters test first
+        #   3. addon.yaml → versions.<env label>        – dev / prod default
+        path: '{{ .path.path }}/{{ $v := index .addon.versions (index .metadata.labels "env" | default "none") }}{{ with index .metadata.labels "ring" }}{{ with index $.addon.versions . }}{{ $v = . }}{{ end }}{{ end }}{{ with index .metadata.labels (printf "%s_version" .addon.label) }}{{ $v = . }}{{ end }}{{ $v }}'
+        helm:
+          releaseName: '{{ .addon.releaseName }}'
+          ignoreMissingValueFiles: true
+          valueFiles:                                                            # later files win
+            - ../common/values.yaml                                              # every cluster
+            - values.yaml                                                        # this chart version
+            - '../common/values-{{ index .metadata.labels "cloud" }}.yaml'        # kind / aws
+            - '../common/values-{{ index .metadata.labels "env" | default "none" }}.yaml'  # NEW: dev / prod
+            - '../common/values-{{ index .metadata.labels "cluster_name" }}.yaml' # one cluster (role ARNs, VPC ID)
+      destination:
+        server: '{{ .server }}'
+        namespace: '{{ .addon.namespace }}'
+      # cert-manager's cainjector fills in webhook caBundles after Argo CD applies
+      # them. Without this, add-ons with webhooks stay OutOfSync.
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true   # don't overwrite the injected caBundle on sync
+        retry:
+          limit: 5
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 3m

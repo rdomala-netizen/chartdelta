@@ -31,6 +31,14 @@ def main(argv):
             sys.exit(f"Error: chart \"{name}\" version \"{version}\" not found")
         shutil.copytree(src, Path(argv[argv.index("--untardir") + 1]) / name)
         return
+    if argv[:1] == ["template"] and len(argv) > 2 and (Path(argv[2]) / "Chart.yaml").is_file() \
+            and "chartdelta-appset-engine" in (Path(argv[2]) / "Chart.yaml").read_text():
+        # Go-template evaluation is delegated to a small Go program (real text/template).
+        import os
+        engine = os.environ.get("FAKE_HELM_ENGINE")
+        if not engine:
+            sys.exit("fake helm: FAKE_HELM_ENGINE is not set")
+        os.execv(engine, [engine] + argv)
     if argv[:1] != ["template"]:
         sys.exit(f"fake helm: unsupported command {argv[:1]}")
     release, chart = argv[1], Path(argv[2])

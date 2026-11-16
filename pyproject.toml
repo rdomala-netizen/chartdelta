@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [{ name = "Radhana" }]
-keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "claude-skill"]
+keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "applicationset", "claude-skill"]
 classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",

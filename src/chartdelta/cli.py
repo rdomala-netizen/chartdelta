@@ -6,11 +6,14 @@ import argparse
 import json
 import sys
 import tempfile
+
+import yaml
 from pathlib import Path
 from typing import Any
 
 from . import __version__
 from .core import ChartDeltaError, DiffResult, RenderOptions, inspect_chart, render_chart, run_diff, to_yaml
+from .appset import export_clusters, render_appset_report, run_appset_diff, run_appset_generate
 from .skill_install import install_skill, skill_text
 from .upgrade import render_report, run_upgrade
 from .values_check import check_values, render_findings
@@ -116,6 +119,41 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("-o", "--output", choices=["yaml", "json"], default="yaml")
     r.add_argument("--build-deps", action="store_true", help="run 'helm dependency build' when subcharts are missing")
 
+    a = sub.add_parser("appset", help="preview an Argo CD ApplicationSet offline: generated Applications and manifest changes")
+    asub = a.add_subparsers(dest="appset_command", required=True)
+
+    def common(p: argparse.ArgumentParser) -> None:
+        p.add_argument("appset_file", type=Path, metavar="APPSET", help="path to the ApplicationSet YAML file")
+        p.add_argument("--clusters", type=Path, metavar="FILE",
+                       help="YAML list of clusters (name, server, labels) for the clusters generator")
+        p.add_argument("--repo", dest="repos", action="append", default=[], metavar="URL=PATH",
+                       help="local checkout to use for a repoURL (repeatable). The repo containing APPSET "
+                            "and the current directory's repo are detected automatically")
+        p.add_argument("--helm", dest="helm_bin", default="helm")
+        p.add_argument("--kube-version", metavar="VER")
+        p.add_argument("--api-versions", action="append", default=[], metavar="API")
+
+    ag = asub.add_parser("generate", help="list the Applications the ApplicationSet generates from your working tree")
+    common(ag)
+    ag.add_argument("-o", "--output", choices=["text", "yaml", "json"], default="text")
+
+    ad = asub.add_parser("diff", help="show which Applications and manifests change between a git ref and your working tree")
+    common(ad)
+    ad.add_argument("-b", "--base", default="HEAD", metavar="REF", help="git ref to compare against (default: HEAD)")
+    ad.add_argument("--app", dest="only", action="append", default=[], metavar="GLOB", help="only Applications matching GLOB (repeatable)")
+    ad.add_argument("-o", "--output", choices=["text", "markdown", "json"], default="text")
+    ad.add_argument("--summary", action="store_true", help="changed resources and fields only, no diff bodies")
+    ad.add_argument("--show-unchanged", action="store_true", help="also list unaffected Applications")
+    ad.add_argument("-C", "--context", type=int, default=3)
+    ad.add_argument("--show-secrets", action="store_true")
+    ad.add_argument("--ignore-version-labels", action="store_true")
+    ad.add_argument("--no-build-deps", action="store_true", help="do not run 'helm dependency build' for charts with missing subcharts")
+    ad.add_argument("--exit-code", action="store_true", help="exit 2 when any Application is affected, 1 on errors")
+
+    ae = asub.add_parser("export-clusters", help="write a clusters file from Argo CD's cluster secrets (names, servers, labels only)")
+    ae.add_argument("--context", help="kubectl context of the cluster running Argo CD")
+    ae.add_argument("-n", "--namespace", default="argocd")
+
     c = sub.add_parser(
         "check-values",
         help="find keys in your values files that the chart silently ignores (typos, wrong nesting)",
@@ -215,9 +253,67 @@ def render_inspect(info: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _appset_main(args: argparse.Namespace) -> int:
+    try:
+        if args.appset_command == "export-clusters":
+            print(yaml.safe_dump({"clusters": export_clusters(args.namespace, args.context)}, sort_keys=False), end="")
+            return 0
+        if not args.appset_file.is_file():
+            raise ChartDeltaError(f"ApplicationSet file not found: {args.appset_file}")
+        opts = RenderOptions(helm_bin=args.helm_bin, kube_version=args.kube_version, api_versions=args.api_versions)
+        if args.appset_command == "generate":
+            apps, warnings, info = run_appset_generate(args.appset_file, args.clusters, args.repos, opts)
+            if args.output == "yaml":
+                print(yaml.safe_dump_all(apps, sort_keys=False), end="")
+            elif args.output == "json":
+                print(json.dumps({"applications": apps, "sources": info, "warnings": warnings}, indent=2, default=str))
+            else:
+                print(f"{len(apps)} Application{'s' if len(apps) != 1 else ''} generated")
+                for w in warnings:
+                    print(f"WARNING: {w}")
+                for i in info:
+                    print(f"\n{i['name']}  ->  {i['destination']} / {i['namespace']}")
+                    for path in i["paths"]:
+                        print(f"  source: {path}")
+                    if i.get("error"):
+                        print(f"  ERROR: {i['error']}")
+                        continue
+                    if i.get("valueFiles"):
+                        print(f"  values used: {', '.join(i['valueFiles'])}")
+                    if i.get("missingValueFiles"):
+                        print(f"  values not present (ignored): {', '.join(i['missingValueFiles'])}")
+                    for note in i.get("notes", []):
+                        print(f"  note: {note}")
+            return 1 if any(i.get("error") for i in info) else 0
+
+        report = run_appset_diff(
+            args.appset_file, args.clusters, args.repos, opts, base_ref=args.base,
+            build_deps=not args.no_build_deps, context=args.context, show_secrets=args.show_secrets,
+            ignore_labels=VERSION_LABELS if args.ignore_version_labels else [], only=args.only,
+        )
+        if args.output == "json":
+            data = report.to_dict()
+            if args.summary:
+                for app in data["applications"]:
+                    for ch in (app["resources"] or {}).get("changes", []):
+                        ch.pop("diff")
+            print(json.dumps(data, indent=2, default=str))
+        else:
+            print(render_appset_report(report, markdown=args.output == "markdown", summary=args.summary,
+                                       show_unchanged=args.show_unchanged))
+        if report.count("error"):
+            return 1
+        return 2 if (args.exit_code and report.has_changes) else 0
+    except ChartDeltaError as exc:
+        print(f"chartdelta: {exc}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     # Accept a path to Chart.yaml as well as the chart directory.
+    if args.command == "appset":
+        return _appset_main(args)
     if args.command == "install-skill":
         try:
             if args.print_only:
