@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Render a Helm chart with real values and diff the manifests against the original (git ref, another chart, or other values). No cluster needed."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [{ name = "Radhana" }]
 keywords = ["helm", "kubernetes", "diff", "gitops", "argocd", "claude-skill"]
 classifiers = [
@@ -33,6 +33,10 @@ path = "src/chartdelta/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/chartdelta"]
+
+# Ship the Claude skill inside the package so `chartdelta install-skill` works after pip/pipx install.
+[tool.hatch.build.targets.wheel.force-include]
+"skills/helm-chart-diff/SKILL.md" = "chartdelta/skill/SKILL.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
