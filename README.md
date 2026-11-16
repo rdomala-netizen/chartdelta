@@ -23,7 +23,7 @@ HEAD@3f2a9c1e -> working tree
 +            memory: 1Gi
 ```
 
-It also ships a [Claude skill](skills/helm-chart-diff/SKILL.md) so Claude can
+It also ships a [Claude skill](https://github.com/rdomala-netizen/chartdelta/blob/main/skills/helm-chart-diff/SKILL.md) so Claude can
 read a chart, run the diff, and explain the impact.
 
 ## Install
@@ -235,9 +235,17 @@ It does not see live-cluster drift.
 
 ## Using the Claude skill
 
-Copy `skills/helm-chart-diff` into your skills folder (for Claude Code:
-`~/.claude/skills/` or a project's `.claude/skills/`), then ask things like
-"what does my change to this chart actually do with prod values?".
+The skill ships inside the package. Install it for Claude Code with:
+
+```sh
+chartdelta install-skill                       # into ~/.claude/skills
+chartdelta install-skill --dir .claude/skills  # for one project only
+```
+
+Start a new Claude Code session, then ask things like "what does my change to
+this chart actually do with prod values?". The skill file itself is
+[on GitHub](https://github.com/rdomala-netizen/chartdelta/blob/main/skills/helm-chart-diff/SKILL.md);
+`chartdelta install-skill --print` shows the copy bundled with your version.
 
 ## Development
 

@@ -34,5 +34,9 @@ path = "src/chartdelta/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/chartdelta"]
 
+# Ship the Claude skill inside the package so `chartdelta install-skill` works after pip/pipx install.
+[tool.hatch.build.targets.wheel.force-include]
+"skills/helm-chart-diff/SKILL.md" = "chartdelta/skill/SKILL.md"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

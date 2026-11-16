@@ -14,6 +14,7 @@ from typing import Any
 from . import __version__
 from .core import ChartDeltaError, DiffResult, RenderOptions, inspect_chart, render_chart, run_diff, to_yaml
 from .appset import export_clusters, render_appset_report, run_appset_diff, run_appset_generate
+from .skill_install import install_skill, skill_text
 from .upgrade import render_report, run_upgrade
 from .values_check import check_values, render_findings
 
@@ -162,6 +163,11 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("-o", "--output", choices=["text", "json"], default="text")
     c.add_argument("--no-render", action="store_true",
                    help="static check only; skip the render probe (no helm needed)")
+
+    k = sub.add_parser("install-skill", help="install the bundled Claude skill (helm-chart-diff) for Claude Code")
+    k.add_argument("--dir", type=Path, default=Path("~/.claude/skills"), metavar="DIR",
+                   help="skills directory (default: ~/.claude/skills; use .claude/skills for one project)")
+    k.add_argument("--print", dest="print_only", action="store_true", help="print the skill instead of installing it")
     return parser
 
 
@@ -308,6 +314,19 @@ def main(argv: list[str] | None = None) -> int:
     # Accept a path to Chart.yaml as well as the chart directory.
     if args.command == "appset":
         return _appset_main(args)
+    if args.command == "install-skill":
+        try:
+            if args.print_only:
+                print(skill_text(), end="")
+            else:
+                path, state = install_skill(args.dir)
+                print(f"Skill {state}: {path}")
+                if state != "unchanged":
+                    print("Start a new Claude Code session to load it.")
+            return 0
+        except ChartDeltaError as exc:
+            print(f"chartdelta: {exc}", file=sys.stderr)
+            return 1
     if args.chart.name in ("Chart.yaml", "Chart.yml") and args.chart.is_file():
         args.chart = args.chart.parent
     try:
